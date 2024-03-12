@@ -1,57 +1,56 @@
 import http from 'http';
-import fs from 'fs';
+import fs from 'fs/promises';
 
-const filePath = './counter.txt';
+const filePath = 'counter.txt';
 
-function modifyCounter(operation) {
-    fs.readFile(filePath, (err, data) => {
-        let currentCount = 0;
-        if (!err) {
-            currentCount = parseInt(data);
-        }
+async function modifyCounter(operation) {
+    let currentCount = 0;
+    try {
+        const data = await fs.readFile(filePath);
+        currentCount = parseInt(data, 10);
+    } catch (err) {
+        console.log('File not found, starting with 0');
+    }
 
-        if (operation === 'increase') {
-            currentCount++;
-        } else if (operation === 'decrease') {
-            currentCount--;
-        }
+    if (operation === 'increase') {
+        currentCount++;
+    } else if (operation === 'decrease') {
+        currentCount--;
+    }
 
-        fs.writeFile(filePath, currentCount.toString(), (err) => {
-            if (err) {
-                console.log('Error writing file', err);
-            }
-        });
-    });
+    await fs.writeFile(filePath, currentCount.toString());
 }
 
-function readCounter(callback) {
-    fs.readFile(filePath, (err, data) => {
-        if (err) {
-            callback('0');
-        } else {
-            callback(data);
-        }
-    });
+async function readCounter() {
+    try {
+        return await fs.readFile(filePath);
+    } catch (err) {
+        return '0';
+    }
 }
 
-const server = http.createServer((req, res) => {
-    switch (req.url) {
-        case '/increase':
-            modifyCounter('increase');
-            res.end('OK');
-            break;
-        case '/decrease':
-            modifyCounter('decrease');
-            res.end('OK');
-            break;
-        case '/read':
-            readCounter((count) => {
+const server = http.createServer(async (req, res) => {
+    try {
+        switch (req.url) {
+            case '/increase':
+                await modifyCounter('increase');
+                res.end('OK');
+                break;
+            case '/decrease':
+                await modifyCounter('decrease');
+                res.end('OK');
+                break;
+            case '/read':
+                const count = await readCounter();
                 res.end(count);
-            });
-            break;
-        default:
-            res.writeHead(404);
-            res.end('Not Found');
+                break;
+            default:
+                res.writeHead(404);
+                res.end('Not Found');
+        }
+    } catch (err) {
+        res.writeHead(500);
+        res.end('Internal Server Error');
     }
 });
 
